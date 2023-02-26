@@ -287,7 +287,10 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
         if mask:
             mask = decode_base64_to_image(mask)
 
-        imgin = canny(decode_base64_to_image(init_images[0]), controlnet_processor_res)
+        base64_decoded = decode_base64_to_image(init_images[0])
+        image = Image.open(io.BytesIO(base64_decoded))
+        image_np = np.array(image)
+        imgin = canny(image_np, controlnet_processor_res)
 
         with queue_lock:
             p = StableDiffusionProcessingImg2Img(
