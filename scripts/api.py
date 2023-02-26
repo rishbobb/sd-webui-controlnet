@@ -383,8 +383,8 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
                 processed.images = []
             shared.state.end()
 
-        b64images = list(map(encode_to_base64, processed.images))
-        return {"images": b64images, "info": processed.js()}
+        # b64images = list(map(encode_to_base64, processed.images))
+        return {"images": [new_image_string], "info": processed.js()}
     
     @app.get("/controlnet/model_list")
     async def model_list():
