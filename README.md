@@ -1,4 +1,8 @@
-## sd-webui-controlnet
+## Changes made:
+
+Fixed /sdapi/v1/progress endpoint functionality
+
+## sd-webui-controlnet (original README)
 (WIP) WebUI extension for ControlNet
 
 This extension is for AUTOMATIC1111's [Stable Diffusion web UI](https://github.com/AUTOMATIC1111/stable-diffusion-webui), allows the Web UI to add [ControlNet](https://github.com/lllyasviel/ControlNet) to the original Stable Diffusion model to generate images. The addition is on-the-fly, the merging is not required.
