@@ -93,7 +93,7 @@ def encode_np_to_base64(image):
 
 def controlnet_api(_: gr.Blocks, app: FastAPI):
 
-    @app.post("/controlnet/progress")
+    @app.get("/controlnet/progress")
     async def progress():
         if shared.state.job_count == 0:
             return ProgressResponse(progress=0, eta_relative=0, state=shared.state.dict(), textinfo=shared.state.textinfo)
@@ -121,7 +121,7 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
         return ProgressResponse(progress=progress, eta_relative=eta_relative, state=shared.state.dict(), current_image=current_image, textinfo=shared.state.textinfo)
 
     @app.post("/controlnet/txt2img")
-    =def txt2img(
+    def txt2img(
         prompt: str = Body("", title='Prompt'),
         negative_prompt: str = Body("", title='Negative Prompt'),
         controlnet_input_image: List[str] = Body([], title='ControlNet Input Image'),
