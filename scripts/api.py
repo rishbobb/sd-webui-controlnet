@@ -24,6 +24,7 @@ from scripts.processor import *
 from threading import Lock
 from modules.call_queue import queue_lock
 from pydantic import BaseModel
+import PIL.ImageOps
 
 class ProgressResponse(BaseModel):
     progress: float = Field(title="Progress", description="The progress with a range of 0 to 1")
@@ -291,7 +292,8 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
         image = Image.open(io.BytesIO(base64_decoded))
         image_np = np.array(image).astype('uint8')
         imgin = canny(image_np, controlnet_processor_res)
-        pil_img = Image.fromarray(imgin)
+        pil_img_in = Image.fromarray(imgin)
+        pil_img = PIL.ImageOps.invert(pil_img_in)
         buff = BytesIO()
         pil_img.save(buff, format="JPEG")
         new_image_string = base64.b64encode(buff.getvalue()).decode("utf-8")
