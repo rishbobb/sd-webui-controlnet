@@ -291,6 +291,8 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
         image = Image.open(io.BytesIO(base64_decoded))
         image_np = np.array(image).astype('uint8')
         imgin = canny(image_np, controlnet_processor_res)
+        imgin2 = base64.b64encode(imgin)
+        imgin3 = decode_base64_to_image(imgin2)
 
         with queue_lock:
             p = StableDiffusionProcessingImg2Img(
@@ -299,7 +301,7 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
                 outpath_grids=opts.outdir_grids or opts.outdir_img2img_grids,
                 prompt=prompt,
                 negative_prompt=negative_prompt,
-                init_images=[imgin],
+                init_images=[imgin3],
                 styles=[],
                 seed=seed,
                 subseed=subseed,
