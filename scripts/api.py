@@ -287,6 +287,8 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
         if mask:
             mask = decode_base64_to_image(mask)
 
+        imgin = canny(decode_base64_to_image(init_images[0]), controlnet_processor_res)
+
         with queue_lock:
             p = StableDiffusionProcessingImg2Img(
                 sd_model=shared.sd_model,
@@ -294,7 +296,7 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
                 outpath_grids=opts.outdir_grids or opts.outdir_img2img_grids,
                 prompt=prompt,
                 negative_prompt=negative_prompt,
-                init_images=[decode_base64_to_image(x) for x in init_images],
+                init_images=[imgin],
                 styles=[],
                 seed=seed,
                 subseed=subseed,
