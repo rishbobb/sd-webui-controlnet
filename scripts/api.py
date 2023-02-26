@@ -291,11 +291,9 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
         image = Image.open(io.BytesIO(base64_decoded))
         image_np = np.array(image).astype('uint8')
         imgin = canny(image_np, controlnet_processor_res)
-        # imgin2 = base64.b64encode(imgin)
-        # imgin3 = decode_base64_to_image(imgin2)
         pil_img = Image.fromarray(imgin)
         buff = BytesIO()
-        pil_img.save(buff, format="PNG")
+        pil_img.save(buff, format="JPEG")
         new_image_string = base64.b64encode(buff.getvalue()).decode("utf-8")
         imgin3 = decode_base64_to_image(new_image_string)
 
