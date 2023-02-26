@@ -21,6 +21,8 @@ import modules.scripts as scripts
 from scripts.controlnet import update_cn_models, cn_models_names
 from scripts.processor import *
 
+from threading import Lock
+
 def validate_sampler_name(name):
     config = sd_samplers.all_samplers_map.get(name, None)
     if config is None:
@@ -80,7 +82,7 @@ def encode_np_to_base64(image):
     pil = Image.fromarray(image)
     return encode_pil_to_base64(pil)
 
-def controlnet_api(_: gr.Blocks, app: FastAPI):
+def controlnet_api(_: gr.Blocks, app: FastAPI, queue_lock: Lock):
 
     @app.post("/controlnet/txt2img")
     async def txt2img(
@@ -118,84 +120,88 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
         override_settings_restore_afterwards: bool = Body(True, title="Restore Override Settings Afterwards"),    
         ):
 
-        p = StableDiffusionProcessingTxt2Img(
-            sd_model=shared.sd_model,
-            outpath_samples=opts.outdir_samples or opts.outdir_txt2img_samples,
-            outpath_grids=opts.outdir_grids or opts.outdir_txt2img_grids,
-            prompt=prompt,
-            styles=[],
-            negative_prompt=negative_prompt,
-            seed=seed,
-            subseed=subseed,
-            subseed_strength=subseed_strength,
-            seed_resize_from_h=-1,
-            seed_resize_from_w=-1,
-            seed_enable_extras=False,
-            sampler_name=sampler_index,
-            batch_size=batch_size,
-            n_iter=n_iter,
-            steps=steps,
-            cfg_scale=cfg_scale,
-            width=width,
-            height=height,
-            restore_faces=restore_faces,
-            tiling=False,
-            enable_hr=enable_hr,
-            denoising_strength=denoising_strength,
-            hr_scale=hr_scale,
-            hr_upscaler=hr_upscale,
-            hr_second_pass_steps=0,
-            hr_resize_x=0,
-            hr_resize_y=0,
-            override_settings=override_settings,
-            do_not_save_samples=True,
-            do_not_save_grid=True,
-        )
+        with queue_lock:
+            p = StableDiffusionProcessingTxt2Img(
+                sd_model=shared.sd_model,
+                outpath_samples=opts.outdir_samples or opts.outdir_txt2img_samples,
+                outpath_grids=opts.outdir_grids or opts.outdir_txt2img_grids,
+                prompt=prompt,
+                styles=[],
+                negative_prompt=negative_prompt,
+                seed=seed,
+                subseed=subseed,
+                subseed_strength=subseed_strength,
+                seed_resize_from_h=-1,
+                seed_resize_from_w=-1,
+                seed_enable_extras=False,
+                sampler_name=sampler_index,
+                batch_size=batch_size,
+                n_iter=n_iter,
+                steps=steps,
+                cfg_scale=cfg_scale,
+                width=width,
+                height=height,
+                restore_faces=restore_faces,
+                tiling=False,
+                enable_hr=enable_hr,
+                denoising_strength=denoising_strength,
+                hr_scale=hr_scale,
+                hr_upscaler=hr_upscale,
+                hr_second_pass_steps=0,
+                hr_resize_x=0,
+                hr_resize_y=0,
+                override_settings=override_settings,
+                do_not_save_samples=True,
+                do_not_save_grid=True,
+            )
 
-        cn_image = Image.open(io.BytesIO(base64.b64decode(controlnet_input_image[0])))        
-        cn_image_np = np.array(cn_image).astype('uint8')
 
-        if controlnet_mask == []:
-            cn_mask_np = np.zeros(shape=(512, 512, 3)).astype('uint8')
-        else:
-            cn_mask = Image.open(io.BytesIO(base64.b64decode(controlnet_mask[0])))        
-            cn_mask_np = np.array(cn_mask).astype('uint8')
-     
-        cn_args = {
-            "control_net_enabled": True,
-            "control_net_module": controlnet_module,
-            "control_net_model": controlnet_model,
-            "control_net_weight": controlnet_weight,
-            "control_net_image": {'image': cn_image_np, 'mask': cn_mask_np},
-            "control_net_scribble_mode": False,
-            "control_net_resize_mode": controlnet_resize_mode,
-            "control_net_rgbbgr_mode": False,
-            "control_net_lowvram": controlnet_lowvram,
-            "control_net_pres": controlnet_processor_res,
-            "control_net_pthr_a": controlnet_threshold_a,
-            "control_net_pthr_b": controlnet_threshold_b,
-            "control_net_guidance_strength": controlnet_guidance,
-            "control_net_guess_mode": controlnet_guessmode,
-            "control_net_api_access": True,
-        }
+            shared.state.begin()
+            cn_image = Image.open(io.BytesIO(base64.b64decode(controlnet_input_image[0])))        
+            cn_image_np = np.array(cn_image).astype('uint8')
 
-        p.scripts = scripts.scripts_txt2img
-        p.script_args = [0, ]
-        for k, v in cn_args.items():
-            setattr(p, k, v)
+            if controlnet_mask == []:
+                cn_mask_np = np.zeros(shape=(512, 512, 3)).astype('uint8')
+            else:
+                cn_mask = Image.open(io.BytesIO(base64.b64decode(controlnet_mask[0])))        
+                cn_mask_np = np.array(cn_mask).astype('uint8')
+        
+            cn_args = {
+                "control_net_enabled": True,
+                "control_net_module": controlnet_module,
+                "control_net_model": controlnet_model,
+                "control_net_weight": controlnet_weight,
+                "control_net_image": {'image': cn_image_np, 'mask': cn_mask_np},
+                "control_net_scribble_mode": False,
+                "control_net_resize_mode": controlnet_resize_mode,
+                "control_net_rgbbgr_mode": False,
+                "control_net_lowvram": controlnet_lowvram,
+                "control_net_pres": controlnet_processor_res,
+                "control_net_pthr_a": controlnet_threshold_a,
+                "control_net_pthr_b": controlnet_threshold_b,
+                "control_net_guidance_strength": controlnet_guidance,
+                "control_net_guess_mode": controlnet_guessmode,
+                "control_net_api_access": True,
+            }
 
-        if cmd_opts.enable_console_prompts:
-            print(f"\ntxt2img: {prompt}", file=shared.progress_print_out)
+            p.scripts = scripts.scripts_txt2img
+            p.script_args = [0, ]
+            for k, v in cn_args.items():
+                setattr(p, k, v)
 
-        processed = process_images(p)            
-        p.close()
+            if cmd_opts.enable_console_prompts:
+                print(f"\ntxt2img: {prompt}", file=shared.progress_print_out)
 
-        generation_info_js = processed.js()
-        if opts.samples_log_stdout:
-            print(generation_info_js)
+            processed = process_images(p)            
+            p.close()
 
-        if opts.do_not_show_images:
-            processed.images = []
+            generation_info_js = processed.js()
+            if opts.samples_log_stdout:
+                print(generation_info_js)
+
+            if opts.do_not_show_images:
+                processed.images = []
+            shared.state.end()
 
         b64images = list(map(encode_to_base64, processed.images))
         
@@ -246,88 +252,91 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
         if mask:
             mask = decode_base64_to_image(mask)
 
-        p = StableDiffusionProcessingImg2Img(
-            sd_model=shared.sd_model,
-            outpath_samples=opts.outdir_samples or opts.outdir_img2img_samples,
-            outpath_grids=opts.outdir_grids or opts.outdir_img2img_grids,
-            prompt=prompt,
-            negative_prompt=negative_prompt,
-            init_images=[decode_base64_to_image(x) for x in init_images],
-            styles=[],
-            seed=seed,
-            subseed=subseed,
-            subseed_strength=subseed_strength,
-            seed_resize_from_h=-1,
-            seed_resize_from_w=-1,
-            seed_enable_extras=False,
-            sampler_name=sampler_index,
-            batch_size=batch_size,
-            n_iter=n_iter,
-            steps=steps,
-            cfg_scale=cfg_scale,
-            width=width,
-            height=height,
-            restore_faces=restore_faces,
-            tiling=False,
-            mask=mask,
-            mask_blur=mask_blur,
-            inpainting_fill=inpainting_fill,
-            resize_mode=resize_mode,
-            denoising_strength=denoising_strength,
-            inpaint_full_res=inpaint_full_res,
-            inpaint_full_res_padding=inpaint_full_res_padding,
-            inpainting_mask_invert=inpainting_mask_invert,
-            override_settings=override_settings,
-            do_not_save_samples=True,
-            do_not_save_grid=True,
-        )
+        with queue_lock:
+            p = StableDiffusionProcessingImg2Img(
+                sd_model=shared.sd_model,
+                outpath_samples=opts.outdir_samples or opts.outdir_img2img_samples,
+                outpath_grids=opts.outdir_grids or opts.outdir_img2img_grids,
+                prompt=prompt,
+                negative_prompt=negative_prompt,
+                init_images=[decode_base64_to_image(x) for x in init_images],
+                styles=[],
+                seed=seed,
+                subseed=subseed,
+                subseed_strength=subseed_strength,
+                seed_resize_from_h=-1,
+                seed_resize_from_w=-1,
+                seed_enable_extras=False,
+                sampler_name=sampler_index,
+                batch_size=batch_size,
+                n_iter=n_iter,
+                steps=steps,
+                cfg_scale=cfg_scale,
+                width=width,
+                height=height,
+                restore_faces=restore_faces,
+                tiling=False,
+                mask=mask,
+                mask_blur=mask_blur,
+                inpainting_fill=inpainting_fill,
+                resize_mode=resize_mode,
+                denoising_strength=denoising_strength,
+                inpaint_full_res=inpaint_full_res,
+                inpaint_full_res_padding=inpaint_full_res_padding,
+                inpainting_mask_invert=inpainting_mask_invert,
+                override_settings=override_settings,
+                do_not_save_samples=True,
+                do_not_save_grid=True,
+            )
 
-        cn_image = Image.open(io.BytesIO(base64.b64decode(controlnet_input_image[0])))        
-        cn_image_np = np.array(cn_image).astype('uint8')
+            shared.state.begin()
+            cn_image = Image.open(io.BytesIO(base64.b64decode(controlnet_input_image[0])))        
+            cn_image_np = np.array(cn_image).astype('uint8')
 
-        if controlnet_mask == [] :
-            cn_mask_np = np.zeros(shape=(512, 512, 3)).astype('uint8')
-        else:
-            cn_mask = Image.open(io.BytesIO(base64.b64decode(controlnet_mask[0])))        
-            cn_mask_np = np.array(cn_mask).astype('uint8')
-     
-        cn_args = {
-            "control_net_enabled": True,
-            "control_net_module": controlnet_module,
-            "control_net_model": controlnet_model,
-            "control_net_weight": controlnet_weight,
-            "control_net_image": {'image': cn_image_np, 'mask': cn_mask_np},
-            "control_net_scribble_mode": False,
-            "control_net_resize_mode": controlnet_resize_mode,
-            "control_net_rgbbgr_mode": False,
-            "control_net_lowvram": controlnet_lowvram,
-            "control_net_pres": controlnet_processor_res,
-            "control_net_pthr_a": controlnet_threshold_a,
-            "control_net_pthr_b": controlnet_threshold_b,
-            "control_net_guidance_strength": controlnet_guidance,
-            "control_net_guess_mode": controlnet_guessmode,
-            "control_net_api_access": True,
-        }
+            if controlnet_mask == [] :
+                cn_mask_np = np.zeros(shape=(512, 512, 3)).astype('uint8')
+            else:
+                cn_mask = Image.open(io.BytesIO(base64.b64decode(controlnet_mask[0])))        
+                cn_mask_np = np.array(cn_mask).astype('uint8')
+        
+            cn_args = {
+                "control_net_enabled": True,
+                "control_net_module": controlnet_module,
+                "control_net_model": controlnet_model,
+                "control_net_weight": controlnet_weight,
+                "control_net_image": {'image': cn_image_np, 'mask': cn_mask_np},
+                "control_net_scribble_mode": False,
+                "control_net_resize_mode": controlnet_resize_mode,
+                "control_net_rgbbgr_mode": False,
+                "control_net_lowvram": controlnet_lowvram,
+                "control_net_pres": controlnet_processor_res,
+                "control_net_pthr_a": controlnet_threshold_a,
+                "control_net_pthr_b": controlnet_threshold_b,
+                "control_net_guidance_strength": controlnet_guidance,
+                "control_net_guess_mode": controlnet_guessmode,
+                "control_net_api_access": True,
+            }
 
-        p.scripts = scripts.scripts_img2img
-        p.script_args = [0, ]
-        for k, v in cn_args.items():
-            setattr(p, k, v)
+            p.scripts = scripts.scripts_img2img
+            p.script_args = [0, ]
+            for k, v in cn_args.items():
+                setattr(p, k, v)
 
-        if shared.cmd_opts.enable_console_prompts:
-            print(f"\nimg2img: {prompt}", file=shared.progress_print_out)
+            if shared.cmd_opts.enable_console_prompts:
+                print(f"\nimg2img: {prompt}", file=shared.progress_print_out)
 
-        p.extra_generation_params["Mask blur"] = mask_blur
+            p.extra_generation_params["Mask blur"] = mask_blur
 
-        processed = process_images(p)            
-        p.close()
+            processed = process_images(p)            
+            p.close()
 
-        generation_info_js = processed.js()
-        if opts.samples_log_stdout:
-            print(generation_info_js)
+            generation_info_js = processed.js()
+            if opts.samples_log_stdout:
+                print(generation_info_js)
 
-        if opts.do_not_show_images:
-            processed.images = []
+            if opts.do_not_show_images:
+                processed.images = []
+            shared.state.end()
 
         b64images = list(map(encode_to_base64, processed.images))
         return {"images": b64images, "info": processed.js()}
