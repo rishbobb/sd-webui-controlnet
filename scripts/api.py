@@ -297,8 +297,7 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
         buff = BytesIO()
         pil_img.save(buff, format="PNG")
         new_image_string = base64.b64encode(buff.getvalue()).decode("utf-8")
-        print(new_image_string)
-        imgin3 = new_image_string
+        imgin3 = decode_base64_to_image(new_image_string)
 
         with queue_lock:
             p = StableDiffusionProcessingImg2Img(
