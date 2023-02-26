@@ -23,6 +23,14 @@ from scripts.processor import *
 
 from threading import Lock
 from modules.call_queue import queue_lock
+from pydantic import BaseModel
+
+class ProgressResponse(BaseModel):
+    progress: float = Field(title="Progress", description="The progress with a range of 0 to 1")
+    eta_relative: float = Field(title="ETA in secs")
+    state: dict = Field(title="State", description="The current state snapshot")
+    current_image: str = Field(default=None, title="Current image", description="The current image in base64 format. opts.show_progress_every_n_steps is required for this to work.")
+    textinfo: str = Field(default=None, title="Info text", description="Info text used by WebUI.")
 
 def validate_sampler_name(name):
     config = sd_samplers.all_samplers_map.get(name, None)
@@ -85,8 +93,35 @@ def encode_np_to_base64(image):
 
 def controlnet_api(_: gr.Blocks, app: FastAPI):
 
+    @app.post("/controlnet/progress")
+    async def progress():
+        if shared.state.job_count == 0:
+            return ProgressResponse(progress=0, eta_relative=0, state=shared.state.dict(), textinfo=shared.state.textinfo)
+
+        # avoid dividing zero
+        progress = 0.01
+
+        if shared.state.job_count > 0:
+            progress += shared.state.job_no / shared.state.job_count
+        if shared.state.sampling_steps > 0:
+            progress += 1 / shared.state.job_count * shared.state.sampling_step / shared.state.sampling_steps
+
+        time_since_start = time.time() - shared.state.time_start
+        eta = (time_since_start/progress)
+        eta_relative = eta-time_since_start
+
+        progress = min(progress, 1)
+
+        shared.state.set_current_image()
+
+        current_image = None
+        if shared.state.current_image and not req.skip_current_image:
+            current_image = encode_pil_to_base64(shared.state.current_image)
+
+        return ProgressResponse(progress=progress, eta_relative=eta_relative, state=shared.state.dict(), current_image=current_image, textinfo=shared.state.textinfo)
+
     @app.post("/controlnet/txt2img")
-    async def txt2img(
+    =def txt2img(
         prompt: str = Body("", title='Prompt'),
         negative_prompt: str = Body("", title='Negative Prompt'),
         controlnet_input_image: List[str] = Body([], title='ControlNet Input Image'),
@@ -156,7 +191,6 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
                 do_not_save_grid=True,
             )
 
-
             shared.state.begin()
             cn_image = Image.open(io.BytesIO(base64.b64decode(controlnet_input_image[0])))        
             cn_image_np = np.array(cn_image).astype('uint8')
@@ -210,7 +244,7 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
 
 
     @app.post("/controlnet/img2img")
-    async def img2img(
+    def img2img(
         init_images: List[str] = Body([], title='Init Images'),
         mask: str = Body(None, title='Mask'),
         mask_blur: int = Body(30, title='Mask Blur'),
