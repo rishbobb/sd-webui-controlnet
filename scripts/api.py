@@ -22,6 +22,7 @@ from scripts.controlnet import update_cn_models, cn_models_names
 from scripts.processor import *
 
 from threading import Lock
+from modules.call_queue import queue_lock
 
 def validate_sampler_name(name):
     config = sd_samplers.all_samplers_map.get(name, None)
@@ -82,7 +83,7 @@ def encode_np_to_base64(image):
     pil = Image.fromarray(image)
     return encode_pil_to_base64(pil)
 
-def controlnet_api(_: gr.Blocks, app: FastAPI, queue_lock: Lock):
+def controlnet_api(_: gr.Blocks, app: FastAPI):
 
     @app.post("/controlnet/txt2img")
     async def txt2img(
