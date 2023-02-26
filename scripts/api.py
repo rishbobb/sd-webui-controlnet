@@ -192,6 +192,7 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
                 do_not_save_grid=True,
             )
 
+            shared.state.begin()
             cn_image = Image.open(io.BytesIO(base64.b64decode(controlnet_input_image[0])))        
             cn_image_np = np.array(cn_image).astype('uint8')
 
@@ -236,6 +237,7 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
 
             if opts.do_not_show_images:
                 processed.images = []
+            shared.state.end()
 
         b64images = list(map(encode_to_base64, processed.images))
         
@@ -334,6 +336,7 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
                 do_not_save_grid=True,
             )
 
+            shared.state.begin()
             cn_image = Image.open(io.BytesIO(base64.b64decode(controlnet_input_image[0])))        
             cn_image_np = np.array(cn_image).astype('uint8')
 
@@ -380,6 +383,7 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
 
             if opts.do_not_show_images:
                 processed.images = []
+            shared.state.end()
 
         b64images = list(map(encode_to_base64, processed.images))
         return {"images": b64images, "info": processed.js()}
