@@ -289,7 +289,7 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
 
         base64_decoded = base64.b64decode(init_images[0])
         image = Image.open(io.BytesIO(base64_decoded))
-        image_np = np.array(image)
+        image_np = np.array(image).astype('uint8')
         imgin = canny(image_np, controlnet_processor_res)
 
         with queue_lock:
