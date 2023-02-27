@@ -288,19 +288,19 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
         if mask:
             mask = decode_base64_to_image(mask)
 
-        base64_decoded = base64.b64decode(init_images[0])
-        image = Image.open(io.BytesIO(base64_decoded))
-        image_np = np.array(image).astype('uint8')
-        imgin = canny(image_np, controlnet_processor_res)
-        # REGULAR IMAGE
-        pil_img = Image.fromarray(imgin)
-        # INVERT IMAGE
-        # pil_img_in = Image.fromarray(imgin)
-        # pil_img = PIL.ImageOps.invert(pil_img_in)
-        buff = BytesIO()
-        pil_img.save(buff, format="JPEG")
-        new_image_string = base64.b64encode(buff.getvalue()).decode("utf-8")
-        imgin3 = decode_base64_to_image(new_image_string)
+        # base64_decoded = base64.b64decode(init_images[0])
+        # image = Image.open(io.BytesIO(base64_decoded))
+        # image_np = np.array(image).astype('uint8')
+        # imgin = canny(image_np, controlnet_processor_res)
+        # # REGULAR IMAGE
+        # pil_img = Image.fromarray(imgin)
+        # # INVERT IMAGE
+        # # pil_img_in = Image.fromarray(imgin)
+        # # pil_img = PIL.ImageOps.invert(pil_img_in)
+        # buff = BytesIO()
+        # pil_img.save(buff, format="JPEG")
+        # new_image_string = base64.b64encode(buff.getvalue()).decode("utf-8")
+        # imgin3 = decode_base64_to_image(new_image_string)
 
         with queue_lock:
             p = StableDiffusionProcessingImg2Img(
@@ -309,7 +309,7 @@ def controlnet_api(_: gr.Blocks, app: FastAPI):
                 outpath_grids=opts.outdir_grids or opts.outdir_img2img_grids,
                 prompt=prompt,
                 negative_prompt=negative_prompt,
-                init_images=[imgin3],
+                init_images=[decode_base64_to_image(x) for x in init_images],
                 styles=[],
                 seed=seed,
                 subseed=subseed,
